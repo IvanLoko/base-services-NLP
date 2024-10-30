@@ -1,0 +1,6 @@
+uvicorn
+fastapi
+fasttext
+huggingface_hub
+psycopg2
+python-multipart

@@ -1,0 +1,7 @@
+transformers
+torch
+uvicorn
+fastapi
+langdetect
+psycopg2
+python-multipart

@@ -1,0 +1,9 @@
+polyglot
+uvicorn
+fastapi
+six
+pyicu
+pycld2
+morfessor
+psycopg2
+python-multipart

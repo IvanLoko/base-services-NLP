@@ -1,0 +1,6 @@
+transformers
+torch
+uvicorn
+fastapi
+psycopg2
+python-multipart

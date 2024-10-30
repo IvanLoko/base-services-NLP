@@ -1,0 +1,17 @@
+table = {
+    "request_id": None,
+    'input_text': None,
+    'task': None,
+    'detect_language': None,
+    'emotion': None,
+    'ner_word': None,
+    'ner_entity': None,
+    'polyglot_language': None,
+    'preprocessed_text': None,
+    'sentiment': None,
+    'translated_text': None,
+    'translated_from_language': None,
+    'translated_to_language': None,
+    'zero-shot': None,
+    'zero-shot_candidate_classes': None,
+}
