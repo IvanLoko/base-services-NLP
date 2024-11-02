@@ -21,7 +21,7 @@ def sentiment_inference(file: bytes = File(...)):
 
     for val in output:
 
-        cursor.execute("INSERT INTO main (request_id, task, input_text, senetiment) VALUES (%s, %s, %s, %s)",
+        cursor.execute("INSERT INTO main (request_id, task, input_text, sentiment) VALUES (%s, %s, %s, %s)",
                        ('request_id', 'sentiment', val['text'], val['label']))
     conn.commit()
 
