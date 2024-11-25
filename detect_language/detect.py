@@ -4,34 +4,33 @@ import psycopg2
 import uvicorn
 from fastapi import FastAPI, File
 import fasttext
-
+from typing import List
 from huggingface_hub import hf_hub_download
 
-model_path = hf_hub_download(repo_id="facebook/fasttext-language-identification", filename="model.bin")
+from datetime import datetime
+
 
 app = FastAPI()
 
 @app.post('/detect_language')
-def detect_inference(file: bytes = File(...)):
+def detect_inference(file: List[str]):
 
-    inp = json.loads(file.decode('utf-8'))
+    inp = file
 
-    output = model.predict(inp['text'])
+    output = model.predict(inp)
+    output = [(inp[i], output[0][i][0].split('__')[-1]) for i in range(len(output[0]))]
 
-    output = {inp['text'][i]: output[0][i][0].split('__')[-1] for i in range(len(output[0]))}
 
-    for key, value in output.items():
-
-        cursor.execute("INSERT INTO main (request_id, task, input_text, detect_language) VALUES (%s, %s, %s, %s)",
-                       ('request_id', 'detect_language', key, value))
-    conn.commit()
+    #Task.current_task().upload_artifact(
+    #    name=f'temp {datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}',
+    #    artifact_object=[output],
+    #)
 
     return output
 
 if __name__ == '__main__':
 
-    conn = psycopg2.connect(dbname="admindb", user="postgres", password="3115", host="127.0.0.1")
-    cursor = conn.cursor()
-
+    model_path = hf_hub_download(repo_id="facebook/fasttext-language-identification", filename="model.bin")
     model = fasttext.load_model(model_path)
+
     uvicorn.run(app, host='0.0.0.0', port=2222)
