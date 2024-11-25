@@ -1,22 +1,21 @@
-import json
-
-import psycopg2
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from transformers import pipeline
-from fastapi import FastAPI, File
+from fastapi import FastAPI
 import uvicorn
+from typing import List
+import argparse
+
 
 app = FastAPI()
 
 @app.post('/ner')
-def ner_inference(file: bytes = File(...)):
+def ner_inference(file: List[str]):
 
-    inp = json.loads(file.decode('utf-8'))
+    inp = file
 
+    output = nlp(inp)
 
-    output = nlp(inp['text'])
-
-    result = {}
+    result = []
 
     for num, text in enumerate(output):
         entity_group = []
@@ -24,26 +23,20 @@ def ner_inference(file: bytes = File(...)):
         for i in text:
             word.append(i['word'])
             entity_group.append(i['entity_group'])
-        result[inp['text'][num]] = {'word': word, 'entity_group': entity_group}
-
-    for key, value in result.items():
-
-        cursor.execute("INSERT INTO ma"
-                       "in (request_id, task, input_text, ner_word, ner_entity) VALUES (%s, %s, %s, %s, %s)",
-                       ('request_id', 'ner', key, value['word'], value['entity_group']))
-    conn.commit()
+        result.append((inp[num], {'word': word, 'entity_group': entity_group}))
 
     return result
 
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--min_len', type=int, default=20)
+
+    args = parser.parse_args()
+
     tokenizer = AutoTokenizer.from_pretrained("Babelscape/wikineural-multilingual-ner")
     model = AutoModelForTokenClassification.from_pretrained("Babelscape/wikineural-multilingual-ner")
+    nlp = pipeline("ner", model=model, tokenizer=tokenizer, grouped_entities=True, device=args.device)
 
-    nlp = pipeline("ner", model=model, tokenizer=tokenizer, grouped_entities=True, device="cuda:0")
-    # print(ner_inference(['Бурятия и Забайкальский край переданы',  'из Сибирского федерального округа ']))
-
-    conn = psycopg2.connect(dbname="admindb", user="postgres", password="3115", host="127.0.0.1")
-    cursor = conn.cursor()
-
-    # ner_inference()
     uvicorn.run(app, host='0.0.0.0', port=4444)
