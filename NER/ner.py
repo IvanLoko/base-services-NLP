@@ -1,87 +1,42 @@
-import re
-
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import pipeline
 from fastapi import FastAPI
 import uvicorn
 from typing import List
-
 import argparse
 
 
 app = FastAPI()
 
+@app.post('/ner')
+def ner_inference(file: List[str]):
 
-def remove_emoji(text):
-    emoji_pattern = re.compile("["
-                               u"\U0001F600-\U0001F64F"  # emoticons
-                               u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-                               u"\U0001F680-\U0001F6FF"  # transport & map symbols
-                               u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-                               u"\U00002500-\U00002BEF"  # chinese char
-                               u"\U00002702-\U000027B0"
-                               u"\U00002702-\U000027B0"
-                               u"\U000024C2-\U0001F251"
-                               u"\U0001f926-\U0001f937"
-                               u"\U00010000-\U0010ffff"
-                               u"\u2640-\u2642"
-                               u"\u2600-\u2B55"
-                               u"\u200d"
-                               u"\u23cf"
-                               u"\u23e9"
-                               u"\u231a"
-                               u"\ufe0f"  # dingbats
-                               u"\u3030"
-                               "]+", flags=re.UNICODE)
-    return emoji_pattern.sub(r'', text)
+    inp = file
 
+    output = nlp(inp)
 
-def remove_url(text):
-    return re.sub(r"https?://[^,\s]+,?", "", text)
+    result = []
 
+    for num, text in enumerate(output):
+        entity_group = []
+        word = []
+        for i in text:
+            word.append(i['word'])
+            entity_group.append(i['entity_group'])
+        result.append((inp[num], {'word': word, 'entity_group': entity_group}))
 
-def remove_tags(text):
-    return ' '.join(re.sub("(@[A-Za-z0-9]+)", " ", text).split())
-
-
-def remove_hashtags(text):
-    return ' '.join(re.sub("(#[A-Za-z0-9]+)", " ", text).split())
-
-
-@app.post('/preprocess')
-def preprocess_text(file: List[str]):
-    output = file
-
-    if args.remove_emoji:
-        output = [remove_emoji(text) for text in output]
-    if args.remove_url:
-        output = [remove_url(text) for text in output]
-    if args.remove_hashtag:
-        output = [remove_hashtags(text) for text in output]
-    if args.remove_tag:
-        output = [remove_tags(text) for text in output]
-
-    output = [text if text != '' else None for text in output]
-
-    # Task.current_task().upload_artifact(
-    #    name=f'temp {datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}',
-    #    artifact_object=[output],
-    # )
-
-    return output
+    return result
 
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
+    parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--min_len', type=int, default=20)
-    parser.add_argument('--max_len', type=int, default=float('inf'))
-    parser.add_argument('--remove_url', type=bool, default=True)
-    parser.add_argument('--remove_tag', type=bool, default=True)
-    parser.add_argument('--remove_hashtag', type=bool, default=True)
-    parser.add_argument('--remove_emoji', type=bool, default=True)
 
     args = parser.parse_args()
-    print(args)
 
-    # task = Task.init(task_name='preprocess', project_name='Base services', task_type='inference')
-    #
-    uvicorn.run(app, host='0.0.0.0', port=1111)
+    tokenizer = AutoTokenizer.from_pretrained("Babelscape/wikineural-multilingual-ner")
+    model = AutoModelForTokenClassification.from_pretrained("Babelscape/wikineural-multilingual-ner")
+    nlp = pipeline("ner", model=model, tokenizer=tokenizer, grouped_entities=True, device=args.device)
+
+    uvicorn.run(app, host='0.0.0.0', port=4444)
