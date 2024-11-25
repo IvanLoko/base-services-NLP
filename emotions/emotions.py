@@ -1,34 +1,38 @@
 import json
-
-import psycopg2
 from transformers import pipeline
 import uvicorn
-from fastapi import FastAPI, File
+from fastapi import FastAPI
+from typing import List
+import argparse
 
 app = FastAPI()
 
+
 @app.post('/emotions')
-def sentiment_inference(file: bytes = File(...)):
+def sentiment_inference(file: List[str]):
+    inp = file
 
-    inp = json.loads(file.decode('utf-8'))
+    output = model(inp, **model_kwargs)
 
-    output = model.predict(inp['text'])
+    output = [(inp[i], {'label': output[i]['label'], 'score': output[i]['score']}) for i in range(len(output))]
 
-    output = {inp['text'][i]: output[i]['label'] for i in range(len(output))}
-
-    for key, value in output.items():
-        cursor.execute("INSERT INTO main (request_id, task, input_text, emotion) VALUES (%s, %s, %s, %s)",
-                       ('request_id', 'emotion', key, value))
-    conn.commit()
+    # Task.current_task().upload_artifact(
+    #    name=f'temp {datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}',
+    #    artifact_object=[output],
+    # )
 
     return output
 
 
 if __name__ == '__main__':
 
-    conn = psycopg2.connect(dbname="admindb", user="postgres", password="3115", host="127.0.0.1")
-    cursor = conn.cursor()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--score', type=float, default=0.6)
 
-    model = pipeline('text-classification', model='seara/rubert-base-cased-ru-go-emotions', device='cuda:0')
+    args = parser.parse_args()
+
+    model_kwargs = {'max_length': 512}
+    model = pipeline('text-classification', model='seara/rubert-base-cased-ru-go-emotions', device=args.device)
 
     uvicorn.run(app, host='0.0.0.0', port=3333)
