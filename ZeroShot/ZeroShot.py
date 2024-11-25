@@ -1,46 +1,65 @@
-import json
-
-import psycopg2
 from transformers import pipeline
 import uvicorn
-from fastapi import FastAPI, File
+from fastapi import FastAPI
+
+import argparse
+import torch
+
+print(torch.cuda.is_available())
 
 app = FastAPI()
 
 CANDIDATE_LABELS = [
-    'Политика',
-    'Бизнес',
-    'Производство',
-    'Наука',
-    'Еда и Напитки',
+    'Транспорт',
+    'Анимация и мультипликация',
+    'Военное дело и геополитика',
+    'Государственная политика и управление',
+    'Дом и сад',
+    'Еда и напитки',
+    'Животные и растения',
     'Здоровье',
-    'Семья и дети',
-    'Красота и мода',
+    'Игры',
+    'История',
+    'Кино и сериалы',
+    'Красота и фитнес',
+    'Культура и искусство',
+    'Люди и общество',
+    'Мировая политика',
+    'Мода и стиль',
+    'Музыка',
+    'Наука',
+    'Недвижимость',
+    'Образование, работа',
+    'Промышленность и бизнес',
+    'Прочее(без класса)',
+    'Психология',
     'Путешествия',
-    'Развлечения',
-    'Спорт',
-    'Новости',
-    'Авто',
-    'Праздники',
-    'Электроника',
-    'Преступность',
-    'Связь',
-    'Выборы',
     'Религия',
-    'Кино',
-    'Сериалы',
-    'Телевидение',
-    'Шоу',
-    'Компьютерные игры',
-    'Язычество',
-    'Война'
+    'Спорт',
+    'Философия',
+    'Шопинг',
+    'Экономика и финансы',
+    'Электроника и технологии',
+    'Религиозная напряженность',
+    'Национальная напряженность',
+    'Политическая напряженность',
+    'Социальная напряженность',
+    'Общественные формации',
+    'Религия',
+    'ЛГБТ',
+    'Патриотизм',
+    'Национальная безопасность',
+    'Семья и дети',
+    'Катастрофы и теракты',
+    'Национализм',
+    'Экстремизм',
 ]
 
 
 @app.post('/zero-shot')
-def zero_shot_inference(file: bytes = File(...)):
+def zero_shot_inference(file: dict):
 
-    inp = json.loads(file.decode('utf-8'))
+    inp = file
 
     if inp['candidate_labels'] == '':
         candidate_labels = CANDIDATE_LABELS
@@ -48,30 +67,25 @@ def zero_shot_inference(file: bytes = File(...)):
         candidate_labels = inp['candidate_labels']
 
     output = model(inp['text'], candidate_labels, )
-    for value in output:
 
-        threshold_zero_shot = [1 if value['scores'][i] > .4 else 0 for i in range(3)]
-        print(value)
-
-        cursor.execute("INSERT INTO main (request_id, task, input_text, zero_shot, zero_shot_threshold)"
-                       " VALUES (%s, %s, %s, %s, %s)",
-                           ('request_id', 'zero-shot', value['sequence'], value['labels'][:3], threshold_zero_shot))
-        conn.commit()
-
-
-    output = {output[i]['sequence']: {'labels': output[i]['labels'][:3], 'scores': output[i]['scores'][:3]} for i in range(len(output))}
+    output = [(output[i]['sequence'], {'labels': output[i]['labels'][:3], 'scores': output[i]['scores'][:3]}) for i
+              in range(len(output))]
 
     return output
 
 if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--device', type=str, default='cuda:1')
+    parser.add_argument('--score', type=float, default=0.6)
+
+    args = parser.parse_args()
+
     model = pipeline("zero-shot-classification",
                      model="joeddav/xlm-roberta-large-xnli",
                      device='cuda',
                      multi_label=True)
-
-    conn = psycopg2.connect(dbname="admindb", user="postgres", password="3115", host="127.0.0.1")
-    cursor = conn.cursor()
 
     uvicorn.run(app, host='0.0.0.0', port=7777)
 
