@@ -50,6 +50,9 @@ def remove_hashtags(text):
 def preprocess_text(file: List[str]):
     output = file
 
+    if args.min_len:
+        output = [text for text in output if (len(text) > args.min_len) and (len(text) < args.max_len)]
+
     if args.remove_emoji:
         output = [remove_emoji(text) for text in output]
     if args.remove_url:
@@ -61,18 +64,13 @@ def preprocess_text(file: List[str]):
 
     output = [text if text != '' else None for text in output]
 
-    # Task.current_task().upload_artifact(
-    #    name=f'temp {datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}',
-    #    artifact_object=[output],
-    # )
-
     return output
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--min_len', type=int, default=20)
+    parser.add_argument('--min_len', type=int, default=None)
     parser.add_argument('--max_len', type=int, default=float('inf'))
     parser.add_argument('--remove_url', type=bool, default=True)
     parser.add_argument('--remove_tag', type=bool, default=True)
@@ -80,8 +78,5 @@ if __name__ == '__main__':
     parser.add_argument('--remove_emoji', type=bool, default=True)
 
     args = parser.parse_args()
-    print(args)
 
-    # task = Task.init(task_name='preprocess', project_name='Base services', task_type='inference')
-    #
     uvicorn.run(app, host='0.0.0.0', port=1111)

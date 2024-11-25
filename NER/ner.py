@@ -13,25 +13,23 @@ def ner_inference(file: List[str]):
 
     inp = file
 
+    if args.min_len:
+        inp = [text for text in inp if len(text) > args.min_len]
+
     output = nlp(inp)
 
     result = []
 
     for num, text in enumerate(output):
-        entity_group = []
-        word = []
         for i in text:
-            word.append(i['word'])
-            entity_group.append(i['entity_group'])
-        result.append((inp[num], {'word': word, 'entity_group': entity_group}))
-
+            result.append((inp[num], {'word': i['word'], 'entity_group': i['entity_group']}))
     return result
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument('--min_len', type=int, default=20)
+    parser.add_argument('--min_len', type=int, default=None)
 
     args = parser.parse_args()
 
