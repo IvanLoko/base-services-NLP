@@ -1,16 +1,16 @@
-import json
 import re
 
-import psycopg2
-from fastapi import FastAPI, File
+from fastapi import FastAPI
 import uvicorn
+from typing import List
 
-from clearml import Task
+import argparse
 
-execute_task = Task(task_name='Preprocess text', task_description='prep')
+
 app = FastAPI()
 
-def remove_emoji(string):
+
+def remove_emoji(text):
     emoji_pattern = re.compile("["
                                u"\U0001F600-\U0001F64F"  # emoticons
                                u"\U0001F300-\U0001F5FF"  # symbols & pictographs
@@ -31,27 +31,57 @@ def remove_emoji(string):
                                u"\ufe0f"  # dingbats
                                u"\u3030"
                                "]+", flags=re.UNICODE)
-    return emoji_pattern.sub(r'', string)
+    return emoji_pattern.sub(r'', text)
+
+
+def remove_url(text):
+    return re.sub(r"https?://[^,\s]+,?", "", text)
+
+
+def remove_tags(text):
+    return ' '.join(re.sub("(@[A-Za-z0-9]+)", " ", text).split())
+
+
+def remove_hashtags(text):
+    return ' '.join(re.sub("(#[A-Za-z0-9]+)", " ", text).split())
+
 
 @app.post('/preprocess')
-def preprocess_text(file: bytes = File(...)):
+def preprocess_text(file: List[str]):
+    output = file
 
-    inp = json.loads(file.decode('utf-8'))
-    inp = inp['text']
-    no_emoji = [remove_emoji(text) for text in inp]
-    output = {inp[num]: re.sub(r"https?://[^,\s]+,?", "", text) for num, text in enumerate(no_emoji)}
+    if args.remove_emoji:
+        output = [remove_emoji(text) for text in output]
+    if args.remove_url:
+        output = [remove_url(text) for text in output]
+    if args.remove_hashtag:
+        output = [remove_hashtags(text) for text in output]
+    if args.remove_tag:
+        output = [remove_tags(text) for text in output]
 
-    for key, value in output.items():
+    output = [text if text != '' else None for text in output]
 
-        cursor.execute("INSERT INTO main (request_id, task, input_text, preprocessed_text) VALUES (%s, %s, %s, %s)",
-                       ('request_id', 'preprocess', key, value))
-    conn.commit()
+    # Task.current_task().upload_artifact(
+    #    name=f'temp {datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}',
+    #    artifact_object=[output],
+    # )
+
     return output
+
 
 if __name__ == '__main__':
 
-    conn = psycopg2.connect(dbname="admindb", user="postgres", password="3115", host="127.0.0.1")
-    cursor = conn.cursor()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--min_len', type=int, default=20)
+    parser.add_argument('--max_len', type=int, default=float('inf'))
+    parser.add_argument('--remove_url', type=bool, default=True)
+    parser.add_argument('--remove_tag', type=bool, default=True)
+    parser.add_argument('--remove_hashtag', type=bool, default=True)
+    parser.add_argument('--remove_emoji', type=bool, default=True)
 
+    args = parser.parse_args()
+    print(args)
 
+    # task = Task.init(task_name='preprocess', project_name='Base services', task_type='inference')
+    #
     uvicorn.run(app, host='0.0.0.0', port=1111)
